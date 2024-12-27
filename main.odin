@@ -13,7 +13,8 @@ PLAYER_WIDTH :: 75
 PLAYER_SPEED :: 15
 JUMP_HEIGHT :: 10
 
-ITEM_SIZE :: 50
+HEART_SIZE :: 50
+HEART_PADDING :: 5
 
 GRAVITY :: 25
 ITEM_DROP_SPEED :: 5
@@ -21,6 +22,13 @@ ITEM_DROP_SPEED :: 5
 MenuState :: enum {
 	MainMenu,
 	Game,
+	GameOver,
+}
+
+ItemSize :: enum {
+	Small  = 25,
+	Medium = 50,
+	Large  = 75,
 }
 
 ItemType :: enum {
@@ -34,6 +42,7 @@ Item :: struct {
 	pos:  rl.Vector2,
 	vel:  rl.Vector2,
 	type: ItemType,
+	size: ItemSize,
 }
 
 Player :: struct {
@@ -43,11 +52,12 @@ Player :: struct {
 }
 
 GlobalState :: struct {
-	player: Player,
-	items:  [dynamic]Item,
-	score:  int,
-	lives:  int,
-	menu:   MenuState,
+	player:      Player,
+	items:       [dynamic]Item,
+	spawn_timer: f32,
+	score:       int,
+	lives:       int,
+	menu:        MenuState,
 }
 
 reset_state :: proc() {
@@ -55,6 +65,8 @@ reset_state :: proc() {
 	items = {}
 	score = 0
 	lives = 3
+
+	spawn_timer = 0
 
 	player.pos = rl.Vector2 {
 		VIRTUAL_WIDTH / 2 - PLAYER_WIDTH / 2,
@@ -66,11 +78,37 @@ reset_state :: proc() {
 
 global: GlobalState
 
-spawn_item :: proc() {
-	item_pos := rl.Vector2{rand.float32_range(0, VIRTUAL_WIDTH - ITEM_SIZE), -ITEM_SIZE}
-	item_type := rand.choice_enum(ItemType)
+rand_type :: proc() -> ItemType {
+	rn := rand.float32()
+	if rn < .5 {
+		return .Coal
+	} else if rn < .75 {
+		return .Gingerbread
+	} else if rn < .9 {
+		return .CandyCane
+	} else {
+		return .Present
+	}
+}
 
-	append(&global.items, Item{item_pos, 0, item_type})
+spawn_item :: proc() {
+	item_pos := rl.Vector2{rand.float32_range(100, VIRTUAL_WIDTH - 100), -100}
+	item_type := rand_type()
+	item_size := rand.choice_enum(ItemSize)
+
+	append(&global.items, Item{item_pos, 0, item_type, item_size})
+}
+
+score_multiplier :: proc(size: ItemSize) -> int {
+	switch size {
+	case .Small:
+		return 1
+	case .Medium:
+		return 2
+	case .Large:
+		return 4
+	}
+	return 0
 }
 
 gui_button :: proc(bounds: rl.Rectangle, text: cstring, font_size: i32) -> (res: bool) {
@@ -103,7 +141,17 @@ update :: proc(delta: f32) {
 		if rl.IsKeyPressed(.SPACE) {
 			menu = .Game
 		}
+	case .GameOver:
+		if rl.IsKeyPressed(.SPACE) {
+			menu = .MainMenu
+		}
 	case .Game:
+		spawn_timer -= delta
+		if spawn_timer <= 0 {
+			spawn_item()
+			spawn_timer = rand.float32_range(0, 0.5)
+		}
+
 		if rl.IsKeyDown(.LEFT) {
 			player.vel.x -= PLAYER_SPEED * delta
 		}
@@ -130,23 +178,19 @@ update :: proc(delta: f32) {
 			player.on_floor = true
 		}
 
-		if rl.IsKeyPressed(.Q) {
-			spawn_item()
-		}
-
 		for &item, i in global.items {
 			item.vel.y += ITEM_DROP_SPEED * delta
 			item.pos += item.vel
 
 			if rl.CheckCollisionCircleRec(
 				item.pos,
-				ITEM_SIZE,
+				f32(item.size),
 				{player.pos.x, player.pos.y, PLAYER_WIDTH, PLAYER_HEIGHT},
 			) {
 				if item.type == .Coal {
 					lives -= 1
 				} else {
-					score += int(item.type)
+					score += int(item.type) * score_multiplier(item.size)
 				}
 
 				unordered_remove(&items, i)
@@ -156,8 +200,21 @@ update :: proc(delta: f32) {
 				unordered_remove(&items, i)
 			}
 		}
+
+		if lives <= 0 {
+			menu = .GameOver
+		}
 	}
 
+}
+
+render_lives :: proc(lives: int) {
+	start := rl.Vector2{10, 10}
+
+	for i in 0 ..< lives {
+		pos := start + {f32(i) * (HEART_SIZE + HEART_PADDING), 0}
+		rl.DrawRectangleV(pos, {HEART_SIZE, HEART_SIZE}, rl.RED)
+	}
 }
 
 render :: proc(camera: ^rl.Camera2D) {
@@ -165,7 +222,14 @@ render :: proc(camera: ^rl.Camera2D) {
 
 	switch menu {
 	case .MainMenu:
-		if gui_button({10, 10, 500, 200}, "Play Game", 24) {menu = .Game}
+		if gui_button({10, 10, 500, 200}, "Play Game", 24) {
+			menu = .Game
+			reset_state()
+		}
+
+	case .GameOver:
+		score_text := fmt.caprintf("Score: %d", global.score)
+		rl.DrawText(score_text, 10, 10, 24, rl.BLACK)
 
 	case .Game:
 		rl.BeginMode2D(camera^)
@@ -180,14 +244,15 @@ render :: proc(camera: ^rl.Camera2D) {
 			if item.type == .Coal {
 				color = rl.RED
 			}
-			rl.DrawCircleV(item.pos, ITEM_SIZE, color)
+			rl.DrawCircleV(item.pos, f32(item.size), color)
 		}
 		rl.EndMode2D()
 
-		score_text := fmt.caprintf("Score: %d", global.score)
-		lives_text := fmt.caprintf("Lives: %d", global.lives)
-		rl.DrawText(score_text, 10, 10, 24, rl.BLACK)
-		rl.DrawText(lives_text, 10, 42, 24, rl.BLACK)
+		score_text := fmt.caprint(global.score)
+		score_text_width := rl.MeasureText(score_text, 48)
+		rl.DrawText(score_text, VIRTUAL_WIDTH - score_text_width - 10, 10, 48, rl.BLACK)
+
+		render_lives(lives)
 	}
 }
 
