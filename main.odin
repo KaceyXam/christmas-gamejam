@@ -8,6 +8,9 @@ VIRTUAL_WIDTH :: 1920
 VIRTUAL_HEIGHT :: 1080
 FLOOR_HEIGHT :: 100
 
+LOGO_WIDTH :: 1000
+LOGO_HEIGHT :: 600
+
 PLAYER_HEIGHT :: 120
 PLAYER_WIDTH :: 75
 PLAYER_SPEED :: 15
@@ -18,6 +21,12 @@ HEART_PADDING :: 5
 
 GRAVITY :: 25
 ITEM_DROP_SPEED :: 5
+
+BUTTON_WIDTH :: 500
+BUTTON_HEIGHT :: 75
+
+font: rl.Font
+logo: rl.Texture2D
 
 MenuState :: enum {
 	MainMenu,
@@ -58,6 +67,7 @@ GlobalState :: struct {
 	score:       int,
 	lives:       int,
 	menu:        MenuState,
+	exit:        bool,
 }
 
 reset_state :: proc() {
@@ -102,32 +112,46 @@ spawn_item :: proc() {
 score_multiplier :: proc(size: ItemSize) -> int {
 	switch size {
 	case .Small:
-		return 1
+		return 4
 	case .Medium:
 		return 2
 	case .Large:
-		return 4
+		return 1
 	}
 	return 0
 }
 
-gui_button :: proc(bounds: rl.Rectangle, text: cstring, font_size: i32) -> (res: bool) {
-	text_width := rl.MeasureText(text, font_size)
+gui_button :: proc(
+	bounds: rl.Rectangle,
+	text: cstring,
+	font_size: f32,
+	button_color, border_color, font_color: rl.Color,
+	border_radius, border_size: f32,
+	camera: ^rl.Camera2D,
+) -> (
+	res: bool,
+) {
+	text_width := rl.MeasureTextEx(font, text, font_size, 1.0)
 
-	mouse_pos := rl.GetMousePosition()
+	mouse_pos := rl.GetScreenToWorld2D(rl.GetMousePosition(), camera^)
 	if rl.IsWindowFocused() && rl.CheckCollisionPointRec(mouse_pos, bounds) {
 		if rl.IsMouseButtonReleased(.LEFT) {
 			res = true
 		}
 	}
 
-	rl.DrawRectangleRec(bounds, rl.GRAY)
-	rl.DrawText(
+	rl.DrawRectangleRounded(bounds, border_radius, 10, button_color)
+	rl.DrawRectangleRoundedLinesEx(bounds, border_radius, 100, border_size, border_color)
+	rl.DrawTextEx(
+		font,
 		text,
-		i32(bounds.x) + (i32(bounds.width) - text_width) / 2,
-		i32(bounds.y) + (i32(bounds.height) - font_size) / 2,
-		font_size,
-		rl.WHITE,
+		rl.Vector2 {
+			(bounds.x) + ((bounds.width) - f32(text_width.x)) / 2,
+			bounds.y + ((bounds.height) - f32(font_size)) / 2,
+		},
+		f32(font_size),
+		1.0,
+		font_color,
 	)
 
 	return res
@@ -149,7 +173,7 @@ update :: proc(delta: f32) {
 		spawn_timer -= delta
 		if spawn_timer <= 0 {
 			spawn_item()
-			spawn_timer = rand.float32_range(0, 0.5)
+			spawn_timer = rand.float32_range(0.1, 0.5)
 		}
 
 		if rl.IsKeyDown(.LEFT) {
@@ -220,19 +244,55 @@ render_lives :: proc(lives: int) {
 render :: proc(camera: ^rl.Camera2D) {
 	using global
 
+	rl.BeginMode2D(camera^)
+
 	switch menu {
 	case .MainMenu:
-		if gui_button({10, 10, 500, 200}, "Play Game", 24) {
+		rl.DrawTextureV(logo, {VIRTUAL_WIDTH / 2 - LOGO_WIDTH / 2, 10}, rl.WHITE)
+
+		play_rect := rl.Rectangle {
+			VIRTUAL_WIDTH / 2 - BUTTON_WIDTH / 2,
+			LOGO_HEIGHT + 50,
+			BUTTON_WIDTH,
+			BUTTON_HEIGHT,
+		}
+
+		if gui_button(play_rect, "Play Game", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
 			menu = .Game
 			reset_state()
 		}
 
+		exit_rect := play_rect
+		exit_rect.y += BUTTON_HEIGHT + 50
+
+		if gui_button(exit_rect, "Exit Game", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
+			exit = true
+		}
+
 	case .GameOver:
-		score_text := fmt.caprintf("Score: %d", global.score)
-		rl.DrawText(score_text, 10, 10, 24, rl.BLACK)
+		score_text := fmt.caprintf("Final Score: %d", global.score)
+		text_width := rl.MeasureTextEx(font, score_text, 128, 1).x
+		rl.DrawTextEx(
+			font,
+			score_text,
+			{VIRTUAL_WIDTH / 2 - text_width / 2, VIRTUAL_HEIGHT / 2 - 128},
+			128,
+			1,
+			rl.BLACK,
+		)
+
+		menu_rect := rl.Rectangle {
+			VIRTUAL_WIDTH / 2 - BUTTON_WIDTH / 2,
+			VIRTUAL_HEIGHT / 2 + BUTTON_HEIGHT,
+			BUTTON_WIDTH,
+			BUTTON_HEIGHT,
+		}
+
+		if gui_button(menu_rect, "Main Menu", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
+			menu = .MainMenu
+		}
 
 	case .Game:
-		rl.BeginMode2D(camera^)
 		rl.DrawRectangleV(
 			{0, VIRTUAL_HEIGHT - FLOOR_HEIGHT},
 			{VIRTUAL_WIDTH, FLOOR_HEIGHT},
@@ -246,14 +306,22 @@ render :: proc(camera: ^rl.Camera2D) {
 			}
 			rl.DrawCircleV(item.pos, f32(item.size), color)
 		}
-		rl.EndMode2D()
 
 		score_text := fmt.caprint(global.score)
-		score_text_width := rl.MeasureText(score_text, 48)
-		rl.DrawText(score_text, VIRTUAL_WIDTH - score_text_width - 10, 10, 48, rl.BLACK)
+		score_text_width := rl.MeasureTextEx(font, score_text, 48, 1).x
+		rl.DrawTextEx(
+			font,
+			score_text,
+			{VIRTUAL_WIDTH - score_text_width - 10, 10},
+			48,
+			1,
+			rl.BLACK,
+		)
 
 		render_lives(lives)
 	}
+
+	rl.EndMode2D()
 }
 
 main :: proc() {
@@ -261,10 +329,23 @@ main :: proc() {
 	rl.InitWindow(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, "Christmas Game")
 	defer rl.CloseWindow()
 
+	font = rl.LoadFontEx("assets/Kanit-Bold.ttf", 128, nil, 0)
+
+	rl.SetTextureFilter(rl.GetFontDefault().texture, .POINT)
+	rl.SetTextureFilter(font.texture, .POINT)
+
+	logo = rl.LoadTextureFromImage(rl.LoadImage("assets/logo.png"))
+
+	rl.SetExitKey(nil)
+
 	reset_state()
 	global.menu = .MainMenu
 
-	for !rl.WindowShouldClose() {
+	for !global.exit {
+		if rl.WindowShouldClose() {
+			global.exit = true
+		}
+
 		delta := rl.GetFrameTime()
 		scale := min(
 			f32(rl.GetScreenWidth()) / VIRTUAL_WIDTH,
