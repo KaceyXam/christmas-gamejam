@@ -28,6 +28,7 @@ BUTTON_HEIGHT :: 75
 font: rl.Font
 logo: rl.Texture2D
 textures: map[ItemType]rl.Texture2D = {}
+background: rl.Texture2D
 
 MenuState :: enum {
 	MainMenu,
@@ -258,6 +259,8 @@ render :: proc(camera: ^rl.Camera2D) {
 
 	rl.BeginMode2D(camera^)
 
+	rl.DrawTextureRec(background, {0, 0, 1920, 1080}, {}, rl.WHITE)
+
 	switch menu {
 	case .MainMenu:
 		rl.DrawTextureV(logo, {VIRTUAL_WIDTH / 2 - LOGO_WIDTH / 2, 10}, rl.WHITE)
@@ -284,13 +287,24 @@ render :: proc(camera: ^rl.Camera2D) {
 	case .GameOver:
 		score_text := fmt.caprintf("Final Score: %d", global.score)
 		text_width := rl.MeasureTextEx(font, score_text, 128, 1).x
+		rl.DrawRectangleRounded(
+			{
+				VIRTUAL_WIDTH / 2 - (text_width + 40) / 2,
+				VIRTUAL_HEIGHT / 3 - 128,
+				text_width + 40,
+				128,
+			},
+			0.5,
+			10,
+			{50, 50, 50, 100},
+		)
 		rl.DrawTextEx(
 			font,
 			score_text,
 			{VIRTUAL_WIDTH / 2 - text_width / 2, VIRTUAL_HEIGHT / 3 - 128},
 			128,
 			1,
-			rl.BLACK,
+			rl.WHITE,
 		)
 
 		menu_rect := rl.Rectangle {
@@ -303,7 +317,6 @@ render :: proc(camera: ^rl.Camera2D) {
 		if gui_button(menu_rect, "Main Menu", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
 			menu = .MainMenu
 		}
-
 
 		exit_rect := menu_rect
 		exit_rect.y += BUTTON_HEIGHT + 50
@@ -336,7 +349,7 @@ render :: proc(camera: ^rl.Camera2D) {
 			{VIRTUAL_WIDTH - score_text_width - 10, 10},
 			48,
 			1,
-			rl.BLACK,
+			rl.WHITE,
 		)
 
 		render_lives(lives)
@@ -361,6 +374,8 @@ main :: proc() {
 	textures[.CandyCane] = rl.LoadTextureFromImage(rl.LoadImage("assets/candycane.png"))
 	textures[.Gingerbread] = rl.LoadTextureFromImage(rl.LoadImage("assets/gingerbread.png"))
 	textures[.Present] = rl.LoadTextureFromImage(rl.LoadImage("assets/present.png"))
+
+	background = rl.LoadTextureFromImage(rl.LoadImage("assets/background.png"))
 
 	rl.SetExitKey(nil)
 
