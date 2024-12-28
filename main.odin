@@ -32,13 +32,23 @@ DARK_RED: rl.Color : {108, 19, 19, 255}
 
 font: rl.Font
 logo: rl.Texture2D
+floor: rl.Texture2D
+heart: rl.Texture2D
 textures: map[ItemType]rl.Texture2D = {}
 background: rl.Texture2D
+sounds: map[SoundEffect]rl.Sound
 
 MenuState :: enum {
 	MainMenu,
 	Game,
 	GameOver,
+}
+
+SoundEffect :: enum {
+	Menu,
+	Collect,
+	Hurt,
+	Explode,
 }
 
 ItemSize :: enum {
@@ -155,6 +165,7 @@ gui_button :: proc(
 	if rl.IsWindowFocused() && rl.CheckCollisionPointRec(mouse_pos, bounds) {
 		if rl.IsMouseButtonReleased(.LEFT) {
 			res = true
+			rl.PlaySound(sounds[.Menu])
 		}
 	}
 
@@ -172,6 +183,7 @@ gui_button :: proc(
 		font_color,
 	)
 
+
 	return res
 }
 
@@ -182,10 +194,12 @@ update :: proc(delta: f32) {
 	case .MainMenu:
 		if rl.IsKeyPressed(.SPACE) {
 			menu = .Game
+			rl.PlaySound(sounds[.Menu])
 		}
 	case .GameOver:
 		if rl.IsKeyPressed(.SPACE) {
 			menu = .MainMenu
+			rl.PlaySound(sounds[.Menu])
 		}
 	case .Game:
 		spawn_timer -= delta
@@ -231,14 +245,20 @@ update :: proc(delta: f32) {
 			) {
 				if item.type == .Coal {
 					lives -= 1
+					if lives >= 1 {
+						rl.PlaySound(sounds[.Hurt])
+					} else {
+						rl.PlaySound(sounds[.Explode])
+					}
 				} else {
 					score += int(item.type) * score_multiplier(item.size)
+					rl.PlaySound(sounds[.Collect])
 				}
 
 				unordered_remove(&items, i)
 			}
 
-			if item.pos.y > VIRTUAL_HEIGHT {
+			if item.pos.y > VIRTUAL_HEIGHT + f32(item.size) {
 				unordered_remove(&items, i)
 			}
 		}
@@ -255,7 +275,7 @@ render_lives :: proc(lives: int) {
 
 	for i in 0 ..< lives {
 		pos := start + {f32(i) * (HEART_SIZE + HEART_PADDING), 0}
-		rl.DrawRectangleV(pos, {HEART_SIZE, HEART_SIZE}, rl.RED)
+		rl.DrawTextureV(heart, pos, rl.WHITE)
 	}
 }
 
@@ -351,23 +371,24 @@ render :: proc(camera: ^rl.Camera2D) {
 		}
 
 	case .Game:
-		rl.DrawRectangleV(
-			{0, VIRTUAL_HEIGHT - FLOOR_HEIGHT},
-			{VIRTUAL_WIDTH, FLOOR_HEIGHT},
-			rl.GREEN,
-		)
+		rl.DrawTextureV(floor, {0, VIRTUAL_HEIGHT - FLOOR_HEIGHT}, rl.WHITE)
 		rl.DrawRectangleV(player.pos, {PLAYER_WIDTH, PLAYER_HEIGHT}, rl.RED)
 		for item in global.items {
-			color := rl.GREEN
-			if item.type == .Coal {
-				color = rl.RED
-			}
-			rl.DrawCircleV(item.pos, f32(item.size), color)
+			// color := rl.GREEN
+			// if item.type == .Coal {
+			// 	color = rl.RED
+			// }
+			// rl.DrawCircleV(item.pos, f32(item.size), color)
 			render_item(item)
 		}
 
 		score_text := fmt.caprint(global.score)
 		score_text_width := rl.MeasureTextEx(font, score_text, 48, 1).x
+		// rl.DrawRectangleV(
+		// 	{VIRTUAL_WIDTH - score_text_width - 20, 0},
+		// 	{score_text_width + 20, 64},
+		// 	rl.BLACK,
+		// )
 		rl.DrawTextEx(
 			font,
 			score_text,
@@ -387,6 +408,8 @@ main :: proc() {
 	rl.SetConfigFlags({.VSYNC_HINT})
 	rl.InitWindow(VIRTUAL_WIDTH, VIRTUAL_HEIGHT, "Christmas Game")
 	defer rl.CloseWindow()
+	rl.InitAudioDevice()
+	defer rl.CloseAudioDevice()
 
 	font = rl.LoadFontEx("assets/Kanit-Bold.ttf", 128, nil, 0)
 
@@ -395,12 +418,34 @@ main :: proc() {
 
 	logo = rl.LoadTextureFromImage(rl.LoadImage("assets/logo.png"))
 	rl.SetTextureFilter(logo, .POINT)
+	defer rl.UnloadTexture(logo)
+	floor = rl.LoadTextureFromImage(rl.LoadImage("assets/floor.png"))
+	rl.SetTextureFilter(floor, .POINT)
+	defer rl.UnloadTexture(floor)
+	heart = rl.LoadTextureFromImage(rl.LoadImage("assets/heart.png"))
+	rl.SetTextureFilter(heart, .POINT)
+	defer rl.UnloadTexture(heart)
 
 	textures[.CandyCane] = rl.LoadTextureFromImage(rl.LoadImage("assets/candycane.png"))
+	defer rl.UnloadTexture(textures[.CandyCane])
 	textures[.Gingerbread] = rl.LoadTextureFromImage(rl.LoadImage("assets/gingerbread.png"))
+	defer rl.UnloadTexture(textures[.Gingerbread])
 	textures[.Present] = rl.LoadTextureFromImage(rl.LoadImage("assets/present.png"))
+	defer rl.UnloadTexture(textures[.Present])
+	textures[.Coal] = rl.LoadTextureFromImage(rl.LoadImage("assets/coal.png"))
+	defer rl.UnloadTexture(textures[.Coal])
 
 	background = rl.LoadTextureFromImage(rl.LoadImage("assets/background.png"))
+	defer rl.UnloadTexture(background)
+
+	sounds[.Menu] = rl.LoadSound("assets/menuSelect.wav")
+	defer rl.UnloadSound(sounds[.Menu])
+	sounds[.Collect] = rl.LoadSound("assets/pickupCoin.wav")
+	defer rl.UnloadSound(sounds[.Collect])
+	sounds[.Hurt] = rl.LoadSound("assets/hitHurt.wav")
+	defer rl.UnloadSound(sounds[.Hurt])
+	sounds[.Explode] = rl.LoadSound("assets/explosion.wav")
+	defer rl.UnloadSound(sounds[.Explode])
 
 	rl.SetExitKey(nil)
 
