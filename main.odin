@@ -34,6 +34,7 @@ font: rl.Font
 logo: rl.Texture2D
 floor: rl.Texture2D
 heart: rl.Texture2D
+robot: rl.Texture2D
 textures: map[ItemType]rl.Texture2D = {}
 background: rl.Texture2D
 sounds: map[SoundEffect]rl.Sound
@@ -75,6 +76,7 @@ Player :: struct {
 	pos:      rl.Vector2,
 	vel:      rl.Vector2,
 	on_floor: bool,
+	is_left:  bool,
 }
 
 GlobalState :: struct {
@@ -101,6 +103,7 @@ reset_state :: proc() {
 	}
 	player.vel = rl.Vector2{}
 	player.on_floor = true
+	player.is_left = true
 }
 
 global: GlobalState
@@ -217,6 +220,12 @@ update :: proc(delta: f32) {
 		if rl.IsKeyPressed(.SPACE) && player.on_floor {
 			player.vel.y -= JUMP_HEIGHT
 			player.on_floor = false
+		}
+
+		if player.vel.x > 0 {
+			player.is_left = false
+		} else if player.vel.x < 0 {
+			player.is_left = true
 		}
 
 		player.pos += player.vel
@@ -372,23 +381,26 @@ render :: proc(camera: ^rl.Camera2D) {
 
 	case .Game:
 		rl.DrawTextureV(floor, {0, VIRTUAL_HEIGHT - FLOOR_HEIGHT}, rl.WHITE)
-		rl.DrawRectangleV(player.pos, {PLAYER_WIDTH, PLAYER_HEIGHT}, rl.RED)
+
+		player_src_rect := rl.Rectangle{0, 0, 150, 240}
+		if !player.is_left {
+			player_src_rect.width *= -1
+		}
+		rl.DrawTexturePro(
+			robot,
+			player_src_rect,
+			{player.pos.x, player.pos.y, PLAYER_WIDTH, PLAYER_HEIGHT},
+			{},
+			0,
+			rl.WHITE,
+		)
+
 		for item in global.items {
-			// color := rl.GREEN
-			// if item.type == .Coal {
-			// 	color = rl.RED
-			// }
-			// rl.DrawCircleV(item.pos, f32(item.size), color)
 			render_item(item)
 		}
 
 		score_text := fmt.caprint(global.score)
 		score_text_width := rl.MeasureTextEx(font, score_text, 48, 1).x
-		// rl.DrawRectangleV(
-		// 	{VIRTUAL_WIDTH - score_text_width - 20, 0},
-		// 	{score_text_width + 20, 64},
-		// 	rl.BLACK,
-		// )
 		rl.DrawTextEx(
 			font,
 			score_text,
@@ -425,6 +437,9 @@ main :: proc() {
 	heart = rl.LoadTextureFromImage(rl.LoadImage("assets/heart.png"))
 	rl.SetTextureFilter(heart, .POINT)
 	defer rl.UnloadTexture(heart)
+	robot = rl.LoadTextureFromImage(rl.LoadImage("assets/robot.png"))
+	rl.SetTextureFilter(robot, .POINT)
+	defer rl.UnloadTexture(robot)
 
 	textures[.CandyCane] = rl.LoadTextureFromImage(rl.LoadImage("assets/candycane.png"))
 	defer rl.UnloadTexture(textures[.CandyCane])
