@@ -1,5 +1,5 @@
 bin_dir := "bin"
-exe := "christmas-catch"
+exe := "holiday_havok"
 
 build:
     odin build . -out:{{bin_dir}}/{{exe}}
