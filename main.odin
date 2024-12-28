@@ -21,6 +21,7 @@ HEART_PADDING :: 5
 
 GRAVITY :: 25
 ITEM_DROP_SPEED :: 5
+ITEM_BOUNCE :: 2
 
 BUTTON_WIDTH :: 500
 BUTTON_HEIGHT :: 100
@@ -66,10 +67,11 @@ ItemType :: enum {
 }
 
 Item :: struct {
-	pos:  rl.Vector2,
-	vel:  rl.Vector2,
-	type: ItemType,
-	size: ItemSize,
+	pos:     rl.Vector2,
+	vel:     rl.Vector2,
+	type:    ItemType,
+	size:    ItemSize,
+	bounced: bool,
 }
 
 Player :: struct {
@@ -126,7 +128,7 @@ spawn_item :: proc() {
 	item_type := rand_type()
 	item_size := rand.choice_enum(ItemSize)
 
-	append(&global.items, Item{item_pos, 0, item_type, item_size})
+	append(&global.items, Item{item_pos, 0, item_type, item_size, false})
 }
 
 render_item :: proc(item: Item) {
@@ -246,6 +248,12 @@ update :: proc(delta: f32) {
 		for &item, i in global.items {
 			item.vel.y += ITEM_DROP_SPEED * delta
 			item.pos += item.vel
+
+			if !item.bounced && item.pos.y >= VIRTUAL_HEIGHT - FLOOR_HEIGHT - f32(item.size) {
+				item.pos.y = VIRTUAL_HEIGHT - FLOOR_HEIGHT - f32(item.size)
+				item.vel.y = -ITEM_BOUNCE
+				item.bounced = true
+			}
 
 			if rl.CheckCollisionCircleRec(
 				item.pos,
