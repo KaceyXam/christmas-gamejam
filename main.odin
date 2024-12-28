@@ -23,7 +23,12 @@ GRAVITY :: 25
 ITEM_DROP_SPEED :: 5
 
 BUTTON_WIDTH :: 500
-BUTTON_HEIGHT :: 75
+BUTTON_HEIGHT :: 100
+
+LIGHT_GREEN: rl.Color : {109, 241, 129, 255}
+DARK_GREEN: rl.Color : {31, 97, 41, 255}
+LIGHT_RED: rl.Color : {241, 109, 109, 255}
+DARK_RED: rl.Color : {108, 19, 19, 255}
 
 font: rl.Font
 logo: rl.Texture2D
@@ -272,7 +277,17 @@ render :: proc(camera: ^rl.Camera2D) {
 			BUTTON_HEIGHT,
 		}
 
-		if gui_button(play_rect, "Play Game", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
+		if gui_button(
+			play_rect,
+			"Play Game",
+			64,
+			LIGHT_GREEN,
+			DARK_GREEN,
+			DARK_GREEN,
+			0.1,
+			5,
+			camera,
+		) {
 			menu = .Game
 			reset_state()
 		}
@@ -280,7 +295,7 @@ render :: proc(camera: ^rl.Camera2D) {
 		exit_rect := play_rect
 		exit_rect.y += BUTTON_HEIGHT + 50
 
-		if gui_button(exit_rect, "Exit Game", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
+		if gui_button(exit_rect, "Exit Game", 64, LIGHT_RED, DARK_RED, DARK_RED, 0.1, 5, camera) {
 			exit = true
 		}
 
@@ -314,14 +329,24 @@ render :: proc(camera: ^rl.Camera2D) {
 			BUTTON_HEIGHT,
 		}
 
-		if gui_button(menu_rect, "Main Menu", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
+		if gui_button(
+			menu_rect,
+			"Main Menu",
+			64,
+			LIGHT_GREEN,
+			DARK_GREEN,
+			DARK_GREEN,
+			0.1,
+			5,
+			camera,
+		) {
 			menu = .MainMenu
 		}
 
 		exit_rect := menu_rect
 		exit_rect.y += BUTTON_HEIGHT + 50
 
-		if gui_button(exit_rect, "Exit Game", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
+		if gui_button(exit_rect, "Exit Game", 64, LIGHT_RED, DARK_RED, DARK_RED, 0.1, 5, camera) {
 			exit = true
 		}
 
