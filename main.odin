@@ -27,6 +27,7 @@ BUTTON_HEIGHT :: 75
 
 font: rl.Font
 logo: rl.Texture2D
+textures: map[ItemType]rl.Texture2D = {}
 
 MenuState :: enum {
 	MainMenu,
@@ -107,6 +108,17 @@ spawn_item :: proc() {
 	item_size := rand.choice_enum(ItemSize)
 
 	append(&global.items, Item{item_pos, 0, item_type, item_size})
+}
+
+render_item :: proc(item: Item) {
+	using item
+
+	fsize := f32(size)
+
+	rect := rl.Rectangle{pos.x - fsize, pos.y - fsize, fsize * 2, fsize * 2}
+	adjusted_pos := pos - fsize / 2
+
+	rl.DrawTexturePro(textures[type], {0, 0, 150, 150}, rect, {}, 0, rl.WHITE)
 }
 
 score_multiplier :: proc(size: ItemSize) -> int {
@@ -275,7 +287,7 @@ render :: proc(camera: ^rl.Camera2D) {
 		rl.DrawTextEx(
 			font,
 			score_text,
-			{VIRTUAL_WIDTH / 2 - text_width / 2, VIRTUAL_HEIGHT / 2 - 128},
+			{VIRTUAL_WIDTH / 2 - text_width / 2, VIRTUAL_HEIGHT / 3 - 128},
 			128,
 			1,
 			rl.BLACK,
@@ -292,6 +304,14 @@ render :: proc(camera: ^rl.Camera2D) {
 			menu = .MainMenu
 		}
 
+
+		exit_rect := menu_rect
+		exit_rect.y += BUTTON_HEIGHT + 50
+
+		if gui_button(exit_rect, "Exit Game", 64, rl.GRAY, rl.DARKGRAY, rl.WHITE, 0.1, 5, camera) {
+			exit = true
+		}
+
 	case .Game:
 		rl.DrawRectangleV(
 			{0, VIRTUAL_HEIGHT - FLOOR_HEIGHT},
@@ -305,6 +325,7 @@ render :: proc(camera: ^rl.Camera2D) {
 				color = rl.RED
 			}
 			rl.DrawCircleV(item.pos, f32(item.size), color)
+			render_item(item)
 		}
 
 		score_text := fmt.caprint(global.score)
@@ -335,6 +356,11 @@ main :: proc() {
 	rl.SetTextureFilter(font.texture, .POINT)
 
 	logo = rl.LoadTextureFromImage(rl.LoadImage("assets/logo.png"))
+	rl.SetTextureFilter(logo, .POINT)
+
+	textures[.CandyCane] = rl.LoadTextureFromImage(rl.LoadImage("assets/candycane.png"))
+	textures[.Gingerbread] = rl.LoadTextureFromImage(rl.LoadImage("assets/gingerbread.png"))
+	textures[.Present] = rl.LoadTextureFromImage(rl.LoadImage("assets/present.png"))
 
 	rl.SetExitKey(nil)
 
